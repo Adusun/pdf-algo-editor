@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="aUBvjSPOFcN9POvWAJ4SRG">
+<head data-page-node-id="xsvUiY62zvpXJBzzBNDlRY">
+<meta charset="utf-8" data-page-node-id="UyHjzETuw9WM18mxXm1Nli">
+<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="DlgzW6LvMgsjzRyF8f8tM0">
+<title>PDF 算法编辑器</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --panel: #ffffff;
+    --border: #e2e0da;
+    --text: #2c2c2a;
+    --text-dim: #6b6a66;
+    --accent: #534ab7;
+    --accent-soft: #eeedfe;
+    --danger: #a32d2d;
+    --ok: #0f6e56;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 14px/1.6 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text);
+    display: flex; flex-direction: column;
+  }
+
+  /* ---- 顶栏 ---- */
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: var(--panel);
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; font-weight: 500; margin: 0; white-space: nowrap; }
+  header h1 span { color: var(--text-dim); font-weight: 400; font-size: 13px; margin-left: 6px; }
+  .spacer { flex: 1; }
+
+  button, select, label.file-btn {
+    font: inherit; font-size: 13px; padding: 6px 12px;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--panel); color: var(--text); cursor: pointer;
+  }
+  button:hover:not(:disabled), label.file-btn:hover { background: #f0efeb; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: #453ca3; }
+  button.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  input[type=file] { display: none; }
+
+  /* ---- 工具栏 ---- */
+  #toolbar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 16px; background: var(--panel);
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .toolgroup { display: flex; gap: 4px; align-items: center; padding-right: 12px; border-right: 1px solid var(--border); }
+  .toolgroup:last-child { border-right: none; }
+  .toolgroup b { font-weight: 400; font-size: 12px; color: var(--text-dim); margin-right: 4px; }
+  input[type=color] { width: 30px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
+  input[type=range] { width: 90px; }
+
+  /* ---- 主体 ---- */
+  #main { flex: 1; display: flex; overflow: hidden; }
+  #pages { flex: 1; overflow: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+
+  .page-wrap { position: relative; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.13); }
+  .page-wrap canvas { display: block; cursor: default; }
+  .page-wrap.annotating canvas { cursor: crosshair; }
+  .page-no {
+    position: absolute; top: 6px; right: 8px; font-size: 11px; color: var(--text-dim);
+    background: rgba(255,255,255,.85); padding: 1px 6px; border-radius: 4px; pointer-events: none;
+  }
+  .page-wrap.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---- 侧栏 ---- */
+  #side {
+    width: 290px; background: var(--panel); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #side .sec { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  #side .sec h3 { font-size: 13px; font-weight: 500; margin: 0 0 8px; color: var(--text); }
+  #side .sec .hint { font-size: 12px; color: var(--text-dim); margin: 0 0 8px; }
+  .kv { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+  .kv span:first-child { color: var(--text-dim); }
+  .kv span:last-child { font-variant-numeric: tabular-nums; }
+  #textout {
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: #faf9f7; border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  #log { font: 11px/1.5 ui-monospace, Menlo, monospace; color: var(--text-dim); max-height: 150px; overflow: auto; }
+  #log .err { color: var(--danger); }
+  #log .warn { color: #854f0b; }
+  #log .ok { color: var(--ok); }
+
+  /* ---- 空状态 ---- */
+  #empty { text-align: center; padding: 80px 20px; color: var(--text-dim); }
+  #empty h2 { font-size: 16px; font-weight: 500; color: var(--text); margin: 0 0 8px; }
+  #empty p { margin: 4px 0; font-size: 13px; }
+
+  /* ---- 拖放遮罩 ---- */
+  #drop {
+    position: fixed; inset: 0; background: rgba(83,74,183,.10);
+    border: 3px dashed var(--accent); display: none; z-index: 99;
+    align-items: center; justify-content: center; font-size: 18px; color: var(--accent);
+  }
+  body.dragging #drop { display: flex; }
+</style>
+</head>
+<body data-page-node-id="fo4SvFeAUJ96w7kNW4PVjo">
+
+<header data-page-node-id="Zfqki63dqK9E2T8C0D4IDP">
+  <h1 data-page-node-id="wpUpWBziI9wJDpJIbSstST">PDF 算法编辑器<span data-page-node-id="UV8LcpRFYz1W0Enqz6LMER">零依赖 · 从字节到像素</span></h1>
+  <div class="spacer" data-page-node-id="wuduxn0nz3KwrObG6RtAoh"></div>
+  <label class="file-btn" data-page-node-id="HrAgpwNEOxx76iBNdXEqGk">打开 PDF<input type="file" id="file" accept="application/pdf,.pdf" data-page-node-id="ZlGLmmLijrRPWe9U4YXAGj"></label>
+  <button id="btnSave" disabled data-page-node-id="YHnK6PVWoYQuIBkHdrw19U">保存（增量）</button>
+  <button id="btnFull" disabled data-page-node-id="VEbfhqQSUYpaH8V9EEb1nr">另存为（重写）</button>
+</header>
+
+<div id="toolbar" data-page-node-id="7p1MD7ZWKJFbZyGUWH8BDB">
+  <div class="toolgroup" data-page-node-id="zPSgNTtXchJ2IV5EUWB6x2">
+    <b data-page-node-id="gEmJscWfRi9bUm5gbqmIhS">工具</b>
+    <button class="tool active" data-tool="none" data-page-node-id="9cvN0Zy6tgEJFvWQrIYxmQ">浏览</button>
+    <button class="tool" data-tool="highlight" data-page-node-id="O4NbH5ZSAeGnj6ebyU5p6y">高亮</button>
+    <button class="tool" data-tool="underline" data-page-node-id="uIJfAQJf3PIEWb2Rd8SG3I">下划线</button>
+    <button class="tool" data-tool="ink" data-page-node-id="vkCi8q99XAaEoq5bgE5Gmd">墨迹</button>
+    <button class="tool" data-tool="note" data-page-node-id="JIfSrM2SpISo16K9AADd4E">便签</button>
+  </div>
+  <div class="toolgroup" data-page-node-id="WJI3RGK7eHv5fl3oWSfFjy">
+    <b data-page-node-id="B3mcMqugi79jWvgb1JJyHV">颜色</b>
+    <input type="color" id="color" value="#ffe94a" data-page-node-id="zHWS35cY9bl6GxbkzzfCFa">
+  </div>
+  <div class="toolgroup" data-page-node-id="YYmSHoaP5WEdyLmqTrBLib">
+    <b data-page-node-id="KeiJ3aBHNekMYNs1z1grkm">笔宽</b>
+    <input type="range" id="width" min="1" max="8" value="2" data-page-node-id="l8Cpm8Wb0sTVwZFBAoN5fr">
+    <span id="widthVal" style="font-size:12px;color:var(--text-dim);width:14px" data-page-node-id="10lPiBoWcEyUbPgnkFl6fy">2</span>
+  </div>
+  <div class="toolgroup" data-page-node-id="1doXbHPbiuO1TjRpmG61k2">
+    <b data-page-node-id="KqeyCIyqFxwUfAnqw9zvyN">页面</b>
+    <button id="btnRotL" disabled data-page-node-id="Aw2d1RVS4fMJ6Uo6dOmt3f">左转 90°</button>
+    <button id="btnRotR" disabled data-page-node-id="cDLqO6e0qVMjehHkmvM2WB">右转 90°</button>
+    <button id="btnDel" disabled data-page-node-id="bxXJ1lSFLOATj60WJAoS0X">删除页</button>
+    <button id="btnAdd" disabled data-page-node-id="XHMpBCKgH1rSyaE5mIo81X">插入空白页</button>
+  </div>
+  <div class="toolgroup" data-page-node-id="Y0G5mZUgKOyF7frkGr93Sf">
+    <b data-page-node-id="0xPqFzxWCzHZSAcE5k5TKu">视图</b>
+    <button id="btnZoomOut" data-page-node-id="b2n7CiDx4tPjnD8qNyq2Ai">−</button>
+    <span id="zoomVal" style="font-size:12px;width:42px;text-align:center" data-page-node-id="jfRyPDx7ghHVawBs6WzmMf">100%</span>
+    <button id="btnZoomIn" data-page-node-id="Yr5YP7Xv0vSqXJUxVz9baF">+</button>
+    <button id="btnFit" data-page-node-id="JWc07XDgHrTLfTrBC408R7">适应宽度</button>
+  </div>
+</div>
+
+<div id="main" data-page-node-id="5cdxCmyeduRXQetsF98gqO">
+  <div id="pages" data-page-node-id="dSvSX8FCOu73alKzyrV9XO">
+    <div id="empty" data-page-node-id="pAC0Elu8h6okTwCc9yAncM">
+      <h2 data-page-node-id="Hywsp9ilDEaE6znuys3QOd">拖入一个 PDF，或点击右上角"打开 PDF"</h2>
+      <p data-page-node-id="KbyZ7aDuXhCAdyfYFtcHkm">本编辑器不使用任何 PDF 库：DEFLATE 解压、xref 链、字体轮廓、抗锯齿光栅化全部自行实现。</p>
+      <p style="margin-top:14px" data-page-node-id="UvxW1QJAgISzLgW0xBQN3B"><button id="btnDemo" data-page-node-id="BDJbpBBgD8FXx6R2PDSsKV">载入内置示例</button></p>
+    </div>
+  </div>
+
+  <aside id="side" data-page-node-id="MEclOji0bWSGQqHnjVBqtg">
+    <div class="sec" data-page-node-id="xvsqBy5IZQ4kVu3aT8rGhQ">
+      <h3 data-page-node-id="EPvb2EbqmtCEEZll9zAjCO">文档</h3>
+      <div class="kv" data-page-node-id="zqJBV7B3Zrb373mFTjGVqM"><span data-page-node-id="zFy6qUMbR7KeE6VHFsejgT">页数</span><span id="iPages" data-page-node-id="LGiUnwAcXT7yj1aWd7NVzR">—</span></div>
+      <div class="kv" data-page-node-id="UxbITm3Ryoc2Y8YPhvu04u"><span data-page-node-id="5xDoLDOPTVueU0VaJNaEuS">对象数</span><span id="iObjs" data-page-node-id="ptQhBDVCt6XmuXgqgJB0GL">—</span></div>
+      <div class="kv" data-page-node-id="Ce0A276axoSmRZsJXOUZ2Z"><span data-page-node-id="8wGfduiPQLyJGAO53W3o69">文件大小</span><span id="iSize" data-page-node-id="QIrVbId2ESa2fENuRe9gVi">—</span></div>
+      <div class="kv" data-page-node-id="hR3EnGAxMN7zBKWyCznhzP"><span data-page-node-id="nxsNvbHQxk7yQCTLp39bnA">解析模式</span><span id="iMode" data-page-node-id="aL6fghMs1CgL2H7JLnVAQu">—</span></div>
+    </div>
+    <div class="sec" data-page-node-id="M4b0CEGTujFHgk3EjygIgm">
+      <h3 data-page-node-id="vXErzM1BViPYw1G2yQjuRf">本页文字（可搜索/复制）</h3>
+      <p class="hint" data-page-node-id="PFdPMeAIYOCnZXEaG1PYwT">由内容流解释器逐字提取，保留坐标与宽度</p>
+      <div id="textout" data-page-node-id="SX3n8K7AWj5kAu4DODT1ws">—</div>
+    </div>
+    <div class="sec" data-page-node-id="1GuVXDF9HWD40m6pfnIDUA">
+      <h3 data-page-node-id="4MvFlxYWc6Cilfo1ZoJELX">标注</h3>
+      <div class="kv" data-page-node-id="qfR9twOg2myvWhUf1m1V9z"><span data-page-node-id="92ClyuSdodvEO8quwkKBfG">已添加</span><span id="iAnnots" data-page-node-id="CvqEF2KxA1S4bZ3Ve54wt8">0</span></div>
+      <div id="log" data-page-node-id="X77znoHUDcNHOBIuoUnaS7"></div>
+    </div>
+  </aside>
+</div>
+
+<div id="drop" data-page-node-id="AaZ3gNOk1GQ4gCBDVCHngo">松手载入 PDF</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

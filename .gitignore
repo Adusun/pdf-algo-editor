@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+*.log
+
+# 测试产物（可用 node test/make-fixtures.mjs 重新生成）
+# 保留这些文件是为了让 clone 下来就能直接跑 node run-all.mjs
+# test/fixtures/*.pdf
+
+# 编辑器临时文件
+*.swp
+.vscode/
+.idea/
